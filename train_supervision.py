@@ -1,5 +1,6 @@
 import pytorch_lightning as pl
 from pytorch_lightning.callbacks import ModelCheckpoint
+from torchmetrics import Accuracy, Specificity
 from tools.cfg import py2cfg
 import os
 import torch
@@ -11,6 +12,7 @@ from pathlib import Path
 from tools.metric import Evaluator
 from pytorch_lightning.loggers import CSVLogger
 import random
+from pytorch_lightning.loggers import WandbLogger
 
 
 def seed_everything(seed):
@@ -97,9 +99,22 @@ class Supervision_Train(pl.LightningModule):
 
         OA = np.nanmean(self.metrics_train.OA())
         iou_per_class = self.metrics_train.Intersection_over_Union()
+        Jaccard = np.nanmean(self.metrics_train.Jaccard())
+        Accuracy = np.nanmean(self.metrics_train.Accuracy())
+        Sensitivity = np.nanmean(self.metrics_train.Recall())
+        Specificity = np.nanmean(self.metrics_train.Specificity())
+        Precision = np.nanmean(self.metrics_train.Precision())
+
+
         eval_value = {'mIoU': mIoU,
                       'F1': F1,
-                      'OA': OA}
+                      'OA': OA,
+                      'Jaccard': Jaccard,
+                      'Accuracy': Accuracy,
+                      'Sensitivity': Sensitivity,
+                      'Specificity': Specificity,
+                      'Precision': Precision
+                      }
         print('train:', eval_value)
 
         iou_value = {}
@@ -108,7 +123,7 @@ class Supervision_Train(pl.LightningModule):
         print(iou_value)
         self.metrics_train.reset()
         loss = torch.stack([x["loss"] for x in outputs]).mean()
-        log_dict = {"train_loss": loss, 'train_mIoU': mIoU, 'train_F1': F1, 'train_OA': OA}
+        log_dict = {"train_loss": loss, 'train_mIoU': mIoU, 'train_F1': F1, 'train_OA': OA, 'train_jac': Jaccard, 'train_recall': Sensitivity, 'train_spec': Specificity, 'train_prec': Precision}
         self.log_dict(log_dict, prog_bar=True)
 
     def validation_step(self, batch, batch_idx):
@@ -144,10 +159,23 @@ class Supervision_Train(pl.LightningModule):
 
         OA = np.nanmean(self.metrics_val.OA())
         iou_per_class = self.metrics_val.Intersection_over_Union()
+        Jaccard = np.nanmean(self.metrics_val.Jaccard())
+        Accuracy = np.nanmean(self.metrics_val.Accuracy())
+        Sensitivity = np.nanmean(self.metrics_val.Recall())
+        Specificity = np.nanmean(self.metrics_val.Specificity())
+        Precision = np.nanmean(self.metrics_val.Precision())
+
+
 
         eval_value = {'mIoU': mIoU,
                       'F1': F1,
-                      'OA': OA}
+                      'OA': OA,
+                      'Jaccard': Jaccard,
+                      'Accuracy': Accuracy,
+                      'Sensitivity': Sensitivity,
+                      'Specificity': Specificity,
+                      'Precision': Precision
+                      }
         print('val:', eval_value)
         iou_value = {}
         for class_name, iou in zip(self.config.classes, iou_per_class):
@@ -156,7 +184,8 @@ class Supervision_Train(pl.LightningModule):
 
         self.metrics_val.reset()
         loss = torch.stack([x["loss_val"] for x in outputs]).mean()
-        log_dict = {"val_loss": loss, 'val_mIoU': mIoU, 'val_F1': F1, 'val_OA': OA}
+        log_dict = {"val_loss": loss, 'val_mIoU': mIoU, 'val_F1': F1, 'val_OA': OA, 'val_Jaccard': Jaccard,
+                    'val_acc': Accuracy,'val_recall': Sensitivity,'val_spec': Specificity, 'val_prec': Precision}
         self.log_dict(log_dict, prog_bar=True)
 
     def configure_optimizers(self):
@@ -184,7 +213,9 @@ def main():
                                           save_last=config.save_last, mode=config.monitor_mode,
                                           dirpath=config.weights_path,
                                           filename=config.weights_name)
-    logger = CSVLogger('lightning_logs', name=config.log_name)
+    # instrument experiment with W&B
+    logger = WandbLogger(project="Skin seg", log_model=False)
+
 
     model = Supervision_Train(config)
     if config.pretrained_ckpt_path:

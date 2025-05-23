@@ -39,11 +39,29 @@ class Evaluator(object):
         tp, fp, tn, fn = self.get_tp_fp_tn_fn()
         IoU = tp / (tp + fn + fp)
         return IoU
+    
+    def Jaccard(self):
+        tp, fp, tn, fn = self.get_tp_fp_tn_fn()
+        Jaccard = tp / (tp + fp + tn)
+        return Jaccard
+        
 
     def Dice(self):
         tp, fp, tn, fn = self.get_tp_fp_tn_fn()
         Dice = 2 * tp / ((tp + fp) + (tp + fn))
         return Dice
+    
+    def Accuracy(self):
+        #TP + TN / TP + TN + FP + FN
+        tp, fp, tn, fn = self.get_tp_fp_tn_fn()
+        Accuracy = (tp+tn) / (tp+tn+fp+fn)
+        return Accuracy
+    
+    def Specificity(self):
+        #TN / TN + FP
+        tp, fp, tn, fn = self.get_tp_fp_tn_fn()
+        Specificity = tn / (tn+fp)
+        return Specificity
 
     def Pixel_Accuracy_Class(self):
         #         TP                                  TP+FP
